@@ -82,6 +82,9 @@ def load_imgs_frame(data_path, frames):
                  "BR":load_img(data_path,frames['BR']), 
                  "TR":load_img(data_path,frames['TR'])}
 
+
+
+
 if __name__ == "__main__":
     data_path='frame4'
     frames={"T":"top_center", "L":"center_left", "B":"bottom_center", "R":"center_right",

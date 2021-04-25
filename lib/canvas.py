@@ -56,7 +56,7 @@ def append_img(imgl, imgr):
     return new_img
 
 if __name__ == "__main__":
-    img=cv2.imread("data/img2.png")
+    img=cv2.imread("static/img2.png")
     h, w, c = img.shape
     alpha=math.pi/180*max(h, w)/min(h,w)
     _canvas_left=canvas_left(img, alpha)

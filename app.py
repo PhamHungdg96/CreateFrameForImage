@@ -1,75 +1,37 @@
-from flask import Flask, request
-from flask_cors import CORS, cross_origin
-from frame_prints import load_imgs_frame,add_padding, add_frame
-from utils import img2base64, crop
+import logging.config
 import os
-from skimage import io
-import cv2
-import numpy as np
-app = Flask(__name__,static_url_path='/static')
-cors = CORS(app)
+from api import settings
+from flask import Flask, Blueprint
+from flask_cors import CORS, cross_origin
+from api.restplus import api
+from api.frame_prints import ns as ns_frame_prints
 
-@app.route('/', methods=['GET'])
-def helloworld():
-    return "helloworld"
 
-@app.route('/framed_prints', methods=["POST"])
-@cross_origin()
-def framed_prints():
-    padding_size=20
-    padding_color=(255,255,255)
-    frame_size=20
-    frame_name='frame2'
-    padding_type=0
-    prints_z=1
-    print(request.json)
-    if not request.json or not "url" in request.json:
-        abort(400)
-    img_src=io.imread(request.json['url'])
-    img_src=cv2.cvtColor(img_src, cv2.COLOR_RGB2BGR)
-    h_img, w_img, c_img=img_src.shape
-    if 'prints' in request.json:
-        prints=request.json['prints']
-        if 'zoom' in prints and prints['zoom']>1:
-            prints_z=float(prints['zoom'])
-        if 'imgW' in prints:
-            prints_w=prints['imgW']
-        else: prints_w=None
-        if 'imgH' in prints:
-            prints_h=prints['imgH']
-        else: prints_h=None
-        if 't' in prints:
-            prints_t=prints['t']
-        else: prints_t=None
-        if 'l' in prints:
-            prints_l=prints['l']
-        else: prints_l=None
-    img_src=crop(img_src,prints_z, prints_w, prints_h, prints_t, prints_l)
-    if 'frame' in request.json:
-        frame=request.json['frame']
-        if 'name' in frame:
-            frame_name=frame['name']
-        if 'size' in frame:
-            frame_size=frame['size']
-    if 'padding' in request.json:
-        padding=request.json['padding']
-        if 'size' in padding:
-            padding_size=padding['size']
-        if 'color' in padding:
-            padding_color=[int(v) for v in str(padding['color']).split(',')]
-        if 'type' in padding:
-            padding_type=padding['type']
-    frames={"T":"top_center", "L":"center_left", "B":"bottom_center", "R":"center_right",
-        "TL":"top_left", "BL":"bottom_left", "BR":"bottom_right", "TR":"top_right"}
-    frame_name_s=os.listdir('data')
-    if not frame_name in frame_name_s:
-        abort(400)
-    frame_load_imgs=load_imgs_frame(frame_name, frames)
-    
-    new_img_padding=add_padding(img_src,padding_size, padding_color)
-    result=add_frame(new_img_padding, frame_load_imgs, frame_size)
-    result=cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
-    return 'data:image/png;base64,'+img2base64(result)
+app = Flask(__name__)
+logging_conf_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'logging.conf'))
+logging.config.fileConfig(logging_conf_path)
+log = logging.getLogger(__name__)
+
+
+def configure_app(flask_app):
+    flask_app.config['SERVER_NAME'] = settings.FLASK_SERVER_NAME
+    flask_app.config['SWAGGER_UI_DOC_EXPANSION'] = settings.RESTPLUS_SWAGGER_UI_DOC_EXPANSION
+    flask_app.config['RESTPLUS_VALIDATE'] = settings.RESTPLUS_VALIDATE
+    flask_app.config['RESTPLUS_MASK_SWAGGER'] = settings.RESTPLUS_MASK_SWAGGER
+    flask_app.config['ERROR_404_HELP'] = settings.RESTPLUS_ERROR_404_HELP
+
+def initialize_app(flask_app):
+    configure_app(flask_app)
+    blueprint = Blueprint('api', __name__, url_prefix='/api')
+    api.init_app(blueprint)
+    api.add_namespace(ns_frame_prints)
+    # api.add_namespace(blog_categories_namespace)
+    flask_app.register_blueprint(blueprint)
+
+def main():
+    initialize_app(app)
+    log.info('>>>>> Starting development server at http://{}/api/ <<<<<'.format(app.config['SERVER_NAME']))
+    app.run(debug=settings.FLASK_DEBUG)
 
 if __name__=="__main__":
-    app.run(debug=True, port=5000)
+    main()
